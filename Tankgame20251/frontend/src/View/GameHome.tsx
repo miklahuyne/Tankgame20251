@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "../Hook/useToast";
+import { SOCKET_URL } from "../GlobalSetting";
 
 type StyleMap = { [key: string]: any };
 
 const SKINS = [
-  { id: "red", name: "Đỏ", img: "/skins/red.png" }, 
-  { id: "mint", name: "Bạc Hà", img: "/skins/mint.png" },
-  { id: "ocean", name: "Đại Dương", img: "/skins/ocean.png" },
-  { id: "lemon", name: "Chanh Tươi", img: "/skins/lemon.png" },
-  { id: "dark", name: "Bóng Đêm", img: "/skins/dark.png" },
+  { id: "scarlet", name: "Scarlet", img: "/skins1/scarlet.png" },
+  { id: "desert", name: "Desert", img: "/skins1/desert.png" },
+  { id: "ocean", name: "Ocean", img: "/skins1/ocean.png" },
+  { id: "lemon", name: "Lemon", img: "/skins1/lemon.png" },
+  { id: "violet", name: "Violet", img: "/skins1/violet.png" },
 ];
 
 export default function LoginPage() {
@@ -20,36 +22,55 @@ export default function LoginPage() {
   const [volume, setVolume] = useState(50);
   const [skinIndex, setSkinIndex] = useState(0);
   const router = useRouter();
+  const toast = useToast();
 
   const handlePlay = async () => {
     if (!username.trim()) {
-      alert("🌱 Đừng quên nhập tên nhé chiến binh!");
+      toast?.("🌱 Đừng quên nhập tên nhé chiến binh!", "warning");
       return;
     }
     const selectedSkin = SKINS[skinIndex].id;
 
-    // Gọi Login API để lây sessionId
-    const res = await fetch('http://localhost:3001/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password }),
-    });
+    try {
+      console.log("Attempting to log in with username:", username);
+      // Gọi Login API để lây sessionId
+      const res = await fetch(`${SOCKET_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password, skin: selectedSkin}),
+      });
+      
 
-    if (!res.ok) {
-      alert("❌ Đăng nhập thất bại! Vui lòng kiểm tra tên và mật khẩu.");
-      return;
+      if (!res.ok) {
+        
+        let msg = `❌ Đăng nhập thất bại với mã lỗi ${res.status}`;
+        const err = await res.json();
+        if (err?.message) msg = `❌ ${err.message}`;
+        toast?.(msg, "error");
+        return;
+      }
+
+      const data = await res.json();
+      const sessionId = data.sessionId;
+      if (!sessionId) {
+        toast?.("❌ Máy chủ không trả về session. Vui lòng thử lại.", "error");
+        return;
+      }
+      // Lưu sessionId vào localStorage
+      localStorage.setItem('tank_session_id', sessionId);
+
+      toast?.("✅ Đăng nhập thành công! Hãy sẵn sàng chiến đấu!", "success");
+
+      // chuyển trang
+      router.push(
+        `/game?username=${encodeURIComponent(username)}&skin=${selectedSkin}`
+      );
+    } catch (err) {
+      console.error('Login error', err);
+      toast?.("⚠️ Không thể kết nối máy chủ. Kiểm tra mạng hoặc thử lại sau.", "warning");
     }
-    const data = await res.json();
-    const sessionId = data.sessionId;
-    // Lưu sessionId vào localStorage
-    localStorage.setItem('tank_session_id', sessionId);
-
-    // chuyển trang
-    router.push(
-      `/game?username=${encodeURIComponent(username)}&skin=${selectedSkin}`
-    );
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -138,6 +159,9 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onPaste={
+                    (e) => { e.preventDefault(); return false; }
+                }
                 style={styles.input}
             />
             <button

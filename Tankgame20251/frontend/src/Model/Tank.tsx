@@ -20,6 +20,8 @@ export type Tank = {
 
     score: number,
     level: number,
+    skin: string;
+    xp: number;
 
 }
 
@@ -28,6 +30,7 @@ export type TankInput = {
     rotate: 'left' | 'right' | 'none',
     clientTimestamp: number,
     isFire: boolean;
+    
 }
 
 export interface TankState {

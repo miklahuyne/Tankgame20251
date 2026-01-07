@@ -2,7 +2,7 @@ import { RefObject } from "react";
 import { KeyMap } from "../Model/KeyMap";
 import { TankState, TankAnimationState } from "../Model/Tank";
 import { TankGunAnimationState } from "../Model/TankGun";
-import { BUSH_SELF_ALPHA } from "../GlobalSetting";
+import { BUSH_SELF_ALPHA, levelUpScores } from "../GlobalSetting";
 
 
 export const tankHealthAnimation = (
@@ -10,7 +10,7 @@ export const tankHealthAnimation = (
   tankState: RefObject<TankState>,
   featureImages: RefObject<HTMLImageElement[]> ,
   viewerId?: string,
-  itemSoundRef?: RefObject<HTMLAudioElement>,
+  itemSoundRef?: RefObject<HTMLAudioElement | null>,
 
 ) => {
   const healthItemImg = featureImages.current ? featureImages.current[0] : null;
@@ -78,15 +78,28 @@ export const tankHealthAnimation = (
 
         // Vẽ level bên trái thanh máu
         ctx.fillStyle = "yellow";
-        ctx.font = "14px Arial";
+        ctx.font = "12px Arial";
         ctx.textAlign = "right";
-        ctx.fillText(`Lv.${p.level}`, healthBarX - 10, healthBarY + healthBarHeight);
+        ctx.fillText(`Lv: ${p.level}`, healthBarX - 10, healthBarY );
+
+
+        // Vẽ XP dưới level chỉ vẽ nếu là tank của mình
+        if(playerId === viewerId) {
+          const nextLevelXp = levelUpScores[p.level + 1 as keyof typeof levelUpScores] ?? 0;
+          ctx.fillStyle = "cyan";
+          ctx.font = "12px Arial";
+          ctx.textAlign = "right";
+          ctx.fillText(`Xp: ${p.xp} / ${nextLevelXp}`, healthBarX - 10, healthBarY + 14 );
+        }
 
         // Vẽ số máu bên phải thanh máu
         ctx.fillStyle = "white";
         ctx.font = "14px Arial";
         ctx.textAlign = "left";
         ctx.fillText(`${p.health}/${p.maxHealth}`, healthBarX + healthBarWidth + 10, healthBarY + healthBarHeight);
+
+        
+
         
         // Vẽ icon item ở trên phía trên tank
         const itemIconSize = 20;
@@ -119,9 +132,11 @@ export const tankHealthAnimation = (
         }
 
         // Vẽ ring thời gian còn lại của item
+        console.log(`Player ${playerId} has item ${p.itemKind} with expire at ${p.itemExpire}`);
         if(p.itemKind !== 'none') {
           const nowTs = Date.now();
-          const timeLeft = p.itemExpire - nowTs;
+          const timeLeft = p.itemExpire - nowTs - 2000;
+          console.log(`Time left for item ${p.itemKind} of player ${playerId}: ${timeLeft}ms`);
           let totalDuration = 0;
           if(p.itemKind === 'shield') totalDuration = 10000;
           else if(p.itemKind === 'speed') totalDuration = 10000;
