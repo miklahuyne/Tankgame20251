@@ -39,7 +39,7 @@ export default function LoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password, skin: selectedSkin}),
+        body: JSON.stringify({ username, skin: selectedSkin}),
       });
       
 
@@ -153,7 +153,7 @@ export default function LoginPage() {
               style={styles.input}
               autoFocus 
             />
-            <input 
+            {/* <input 
                 type="password"
                 placeholder="Nhập mật khẩu..."
                 value={password}
@@ -163,7 +163,7 @@ export default function LoginPage() {
                     (e) => { e.preventDefault(); return false; }
                 }
                 style={styles.input}
-            />
+            /> */}
             <button
               onClick={handlePlay}
               style={styles.playButton}

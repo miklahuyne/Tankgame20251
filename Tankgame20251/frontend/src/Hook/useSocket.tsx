@@ -24,11 +24,11 @@ export const useSocket = () => {
       // Lấy sessionId từ localStorage 
       let sessionId = localStorage.getItem('tank_session_id');
       // Nếu chưa có yêu cầu quay lại đăng nhập để tạo mới
-      if (!sessionId) {
-        toast?.('⏳ Phiên đã hết hạn. Vui lòng đăng nhập lại.', 'warning');
-        window.location.href = '/';
-        return;
-      }
+      // if (!sessionId) {
+      //   toast?.('⏳ Phiên đã hết hạn. Vui lòng đăng nhập lại.', 'warning');
+      //   window.location.href = '/';
+      //   return;
+      // }
       const socket = io(SOCKET_URL, {
         transports: ["websocket"],
         // Gửi SessionID lên server
