@@ -1,14 +1,12 @@
-// src/game/game.service.ts
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Server } from 'socket.io';
-
-// Import MapData nội bộ (Copy file MapData vào backend/src/Model/MapData.ts trước nhé)
+import { sessionStore } from 'src/auth/session.store';
 import { generateMap, MapData } from 'src/websockets/model/MapData';
 import { bulletVSTankCollision } from './collision/BulletVSTankCollision';
 import { bulletWallCollision } from './collision/BulletWallCollision';
 import { tankCollision } from './collision/TankCollision';
 import { tankWallCollision } from './collision/TankWallCollision';
-import { Bullet, BulletInputBuffer, BulletState } from './model/Bullet';
+import { BulletInputBuffer, BulletState } from './model/Bullet';
 import { createInitialTank, TankInput, TankInputBuffer, TankState } from './model/Tank';
 import { BushService } from './service/BushService';
 import { MapService } from './service/MapService';
@@ -17,7 +15,6 @@ import { TowerService } from './service/TowerService';
 import { BulletStateManager } from './state/BulletStateManager';
 import { TankStateManager } from './state/TankStateManager';
 import { GridSpatial } from './utils/GridSpartial';
-import { sessionStore } from 'src/auth/session.store';
 
 @Injectable()
 export class GameService implements OnModuleInit {
@@ -37,7 +34,6 @@ export class GameService implements OnModuleInit {
     bulletStates: {},
   };
 
-  // private visibilityService: VisibilityService;
   private mapService: MapService;
   private tankManager: TankStateManager;
   private bulletManager: BulletStateManager;
@@ -49,33 +45,28 @@ export class GameService implements OnModuleInit {
 
   constructor() {}
 
-  //private gameInputState: GameInputState = {};
   private tankInputBuffer: TankInputBuffer = {};
   private bulletInputBuffer: BulletInputBuffer = {};
 
   private server: Server;
   private readonly GAME_TICK_RATE = 1000 / 60;
   private itemNumber = 0;
-  private disconnectTimestamps = new Map<string, number>();
 
   setServer(server: Server) {
     this.server = server;
   }
 
   getMap() {
-      return this.currentMap;
+    return this.currentMap;
   }
 
   getTank(id: string) {
-      return this.tankState.tankStates[id];
+    return this.tankState.tankStates[id];
   }
 
   onModuleInit() {
-    // Deep copy map gốc
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    this.currentMap = JSON.parse(JSON.stringify(generateMap()));
+    this.currentMap = generateMap();
     // init services
-    // this.visibilityService = new VisibilityService(this.currentMap);
     this.mapService = new MapService(this.currentMap.map);
     this.tankManager = new TankStateManager();
     this.bulletManager = new BulletStateManager();
@@ -84,38 +75,43 @@ export class GameService implements OnModuleInit {
     this.bushService = new BushService(this.currentMap.map, this.server);
     setInterval(() => this.gameLoop(), this.GAME_TICK_RATE);
 
-    // Spawn initial pickups (3 items at start)
-    for (let i = 0; i < 3; i++) {
-      this.pickupService.spawnRandomPickup();
-    }
-
-    // Định kỳ: di chuyển lại một số bụi sang vị trí ngẫu nhiên
+    // Định kỳ: di chuyển lại một số bụi sang vị trí ngẫu nhiên mỗi 60-120s
     setInterval(() => {
       try {
-        this.bushService.relocateBushes(8); // đổi vị trí 8 cụm bụi mỗi chu kỳ
+        const delay = 60000 + Math.random() * 60000; // 60-120s
+        setTimeout(() => {
+          this.bushService.relocateBushes(10); // di chuyển tối đa 10 bụi
+        }, delay);
       } catch {
         // swallow errors to keep timer alive
       }
-    }, 30000); // 30s
+    }, 120000); // kiểm tra mỗi 2 phút
 
-    // Spawn new pickups periodically (every 10 seconds) to keep items on map
+    // Spawn new pickups periodically (every 30 seconds) để duy trì tối đa 50 item
     setInterval(() => {
       try {
         this.pickupService.spawnRandomPickup();
       } catch {
         // swallow errors to keep timer alive
       }
-    }, 10000); // 10s
-
-   
+    }, 30000); // 30s
   }
 
-  addPlayer(id: string, name: string, sessionId: string) {
+  addXp(playerId: string, xp: number) {
+    const tank = this.tankState.tankStates[playerId];
+    if (!tank) return;
+    tank.xp += xp;
+    console.log(`Player ${playerId} gained ${xp} XP. Total XP: ${tank.xp}`);
+  }
+
+  addPlayer(id: string, name: string, sessionId: string, skin: string) {
+    // Kiểm tra session hợp lệ
+
     // Khởi tạo trạng thái input
     this.tankInputBuffer[id] = [];
     this.bulletInputBuffer[id] = [];
 
-    const newTank = createInitialTank(id, name);
+    const newTank = createInitialTank(id, name, skin);
     this.tankState.tankStates[id] = newTank;
     this.tankSessions.set(id, sessionId);
 
@@ -128,11 +124,12 @@ export class GameService implements OnModuleInit {
       }, 100);
     }
   }
+
   removePlayer(id: string) {
     console.log(`Player ${id} disconnected (Connection lost).`);
 
     delete this.tankState.tankStates[id];
-    
+
     // Xóa buffer
     delete this.bulletInputBuffer[id];
     delete this.tankInputBuffer[id];
@@ -156,17 +153,18 @@ export class GameService implements OnModuleInit {
   private gameLoop() {
     // Gửi trạng thái game MỚI đến tất cả client
     if (this.server) {
-      this.tankManager.update(this.tankState,this.tankInputBuffer,this.bulletInputBuffer,this.server);
+      this.tankManager.update(
+        this.tankState,
+        this.tankInputBuffer,
+        this.bulletInputBuffer,
+        this.server,
+      );
 
       this.bulletManager.update(this.bulletState, this.bulletInputBuffer, this.tankState);
 
       this.gridSpatial.updateGrid(
         Object.values(this.tankState.tankStates),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-call
-        (Object.values(this.bulletState.bulletStates) as any).flatMap(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return,@typescript-eslint/no-unsafe-argument
-          (bullets: any) => Object.values(bullets) as any,
-        ) as Bullet[],
+        Object.values(this.bulletState.bulletStates),
       );
 
       tankCollision(this.tankState.tankStates);
@@ -176,20 +174,19 @@ export class GameService implements OnModuleInit {
         this.bulletState.bulletStates,
         this.tankState,
         this.server,
+        this.towerService.onTowerDestroyed.bind(this.towerService),
       );
 
       bulletVSTankCollision(
         this.tankState.tankStates,
         this.bulletState.bulletStates,
         this.gridSpatial,
-        this.server
+        this.server,
       );
 
       this.tankState.serverTimestamp = Date.now();
       this.bulletState.serverTimestamp = Date.now();
 
-      // console.log('Emitting tank and bullet states to clients');
-      // console.log('Tank State:', this.tankState);
       this.server.emit('tankState', this.tankState);
       this.server.emit('bulletState', this.bulletState);
     }

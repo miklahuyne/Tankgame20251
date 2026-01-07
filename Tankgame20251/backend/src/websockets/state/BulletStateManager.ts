@@ -1,6 +1,4 @@
-import { BulletState, BulletInputBuffer, Bullet } from '../model/Bullet';
-import { MapCell } from '../model/MapData';
-import { bulletWallCollision } from '../collision/BulletWallCollision';
+import { Bullet, BulletInputBuffer, BulletState } from '../model/Bullet';
 import { TankState } from '../model/Tank';
 
 
@@ -18,12 +16,13 @@ export class BulletStateManager {
       let inputs = bulletInputBuffer[pid];
       const now = Date.now();
       inputs.sort((a, b) => a.clientTimestamp - b.clientTimestamp);
-      inputs = inputs.filter((i) => now - i.clientTimestamp <= 100);
+      inputs = inputs.filter((i) => now - i.clientTimestamp <= 10000);
 
       // Tạo đạn
       for (const i of inputs) {
-        console.log(`Creating bullet for player ${pid} with input:`, i);
-        const numBullets = Math.floor(tank.level / 5) + 1;
+        // console.log(`Creating bullet for player ${pid} with input:`, i);
+        var numBullets = Math.floor(tank.level / 7) + 1; // Mỗi 7 level thêm 1 đạn
+        numBullets = Math.min(numBullets, 8); // Giới hạn tối đa 8 đạn
         
         for (let b = 0; b < numBullets; b++) {
           const spreadAngle = (b - (numBullets - 1) / 2) * 20;

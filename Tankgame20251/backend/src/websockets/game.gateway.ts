@@ -1,4 +1,5 @@
-// src/game/game.gateway.ts
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   WebSocketGateway,
   SubscribeMessage,
@@ -12,7 +13,6 @@ import { Socket, Server } from 'socket.io';
 import * as gameService from './game.service';
 import { Logger, OnModuleInit } from '@nestjs/common';
 import type { TankInput } from './model/Tank';
-import type { BulletInput } from './model/Bullet';
 import { sessionStore } from 'src/auth/session.store';
 
 @WebSocketGateway({
@@ -31,6 +31,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     this.gameService.setServer(this.server);
   }
 
+//   @SubscribeMessage("gain_xp")
+// handleGainXp(@MessageBody() data: { playerId: string; xp: number }) {
+//   console.log(
+//     `Received gain_xp for player ${data.playerId} with xp ${data.xp}`
+//   );
+//   this.gameService.addXp(data.playerId, data.xp);
+// }
+
   // Xử lý khi Client kết nối
   handleConnection(@ConnectedSocket() client: Socket) {
     // Lấy thông tin username từ sessionStore
@@ -44,15 +52,21 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       return;
     }
 
+    if (sessionVal.socketId && sessionVal.socketId !== client.id) {
+        this.server.sockets.sockets
+        .get(sessionVal.socketId)
+        ?.disconnect(true);
+    }
+    sessionVal.socketId = client.id;
+
+    sessionStore.set(sessionId, sessionVal);
+
     const username = sessionVal.username;
+    const skin = sessionVal.skin;
 
-    this.logger.log(
-      `Client connected: ${client.id} (User: ${username}, Session: ${sessionId})`
-    );
-
-    this.gameService.addPlayer(client.id, username, sessionId);
+    this.logger.log(`Client connected: ${client.id} (User: ${username}, Session: ${sessionId}), Skin : ${skin}` );
+    this.gameService.addPlayer(client.id, username, sessionId, skin);
   }
-
 
   // Xử lý khi Client ngắt kết nối
   handleDisconnect(@ConnectedSocket() client: Socket) {
@@ -64,6 +78,15 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   // Dữ liệu client gửi lên: socket.emit('playerInput', { direction: 'right' });
   @SubscribeMessage('tankInput')
   handleMove(@MessageBody() tankInput: TankInput, @ConnectedSocket() client: Socket): void {
+    // console.log("🔥 TANK INPUT RECEIVED", client.id, tankInput);
     this.gameService.handleTankInput(client.id, tankInput);
   }
+
+  @SubscribeMessage("ping")
+handlePing(@MessageBody() clientTime: number) {
+  return {
+    event: "pong",
+    data: Date.now(),
+  };
+}
 }
